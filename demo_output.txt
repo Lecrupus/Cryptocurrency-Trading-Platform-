@@ -1,0 +1,274 @@
+CSVReader: read 3540 entries from 20200317.csv
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:24.884492
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 1
+Help - Your aim is to make money. Analyse the market and trade.
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:24.884492
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 2
+Product: BTC/USDT
+  Asks seen: 50 | max 5460.12333827 | min 5351.99999999
+  Bids seen: 50 | max 5348.85024890 | min 5284.37507018
+  Spread   : 3.14975109
+Product: DOGE/BTC
+  Asks seen: 50 | max 0.00000080 | min 0.00000031
+  Bids seen: 30 | max 0.00000030 | min 0.00000001
+  Spread   : 0.00000001
+Product: DOGE/USDT
+  Asks seen: 50 | max 0.00204000 | min 0.00165524
+  Bids seen: 50 | max 0.00163399 | min 0.00010000
+  Spread   : 0.00002125
+Product: ETH/BTC
+  Asks seen: 50 | max 0.02227042 | min 0.02189093
+  Bids seen: 50 | max 0.02187308 | min 0.02160336
+  Spread   : 0.00001785
+Product: ETH/USDT
+  Asks seen: 50 | max 121.41708000 | min 117.32924371
+  Bids seen: 50 | max 117.05634318 | min 113.00000000
+  Spread   : 0.27290053
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:24.884492
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 5
+Wallet:
+  BTC    : 10.00000000
+  ETH    : 100.00000000
+  USDT   : 100000.00000000
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:24.884492
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 4
+Make a bid - product,price,amount, eg ETH/BTC,0.02,0.5
+ETH/BTC,0.03,2.0
+Wallet looks good. Order placed.
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:24.884492
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 9
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:24.884492
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 4
+Make a bid - product,price,amount, eg ETH/BTC,0.02,0.5
+ETH/BTC,not_a_number,5
+Bad input! Could not read price/amount.
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:24.884492
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 4
+Make a bid - product,price,amount, eg ETH/BTC,0.02,0.5
+BTC/USDT,999999,50
+Wallet has insufficient funds.
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:24.884492
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 6
+Going to next time frame...
+Matching BTC/USDT -> 0 sales
+Matching DOGE/BTC -> 0 sales
+Matching DOGE/USDT -> 0 sales
+Matching ETH/BTC -> 1 sales
+  *** YOUR TRADE FILLED *** price 0.02189093 amount 2
+Matching ETH/USDT -> 0 sales
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:30.099017
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 5
+Wallet:
+  BTC    : 9.95621814
+  ETH    : 102.00000000
+  USDT   : 100000.00000000
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:30.099017
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 3
+Make an ask - product,price,amount, eg ETH/BTC,0.02,0.5
+ETH/BTC,0.020,1.5
+Wallet looks good. Order placed.
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:30.099017
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 6
+Going to next time frame...
+Matching BTC/USDT -> 0 sales
+Matching DOGE/BTC -> 0 sales
+Matching DOGE/USDT -> 0 sales
+Matching ETH/BTC -> 1 sales
+  *** YOUR TRADE FILLED *** price 0.02 amount 1.5
+Matching ETH/USDT -> 0 sales
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:35.103526
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 5
+Wallet:
+  BTC    : 9.98621814
+  ETH    : 100.50000000
+  USDT   : 100000.00000000
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:35.103526
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 7
+Exporting dashboard data...
+Wrote dashboard_data.js (3540 entries, 2 of your trades).
+Open dashboard.html in a browser to view it.
+
+========================================
+MERKEL REX TRADING PLATFORM
+Current Time: 2020/03/17 17:01:35.103526
+========================================
+1: Print help
+2: Print exchange stats
+3: Make an offer (Sell)
+4: Make a bid (Buy)
+5: Print wallet
+6: Continue (Next Time Step)
+7: Export dashboard
+8: Exit
+========================================
+Type in 1-8: 8
+Goodbye.

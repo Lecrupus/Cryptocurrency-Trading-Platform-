@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merkel Rex — order book, 17 March 2020</title>
+<script src="dashboard_data.js"></script>
+<style>
+  :root {
+    --ink:    #12233A;
+    --ground: #EDF0F3;
+    --panel:  #F8FAFB;
+    --line:   #C9D2DA;
+    --muted:  #63758A;
+    --bid:    #1F6F6B;
+    --ask:    #8F2F44;
+    --mine:   #B8860B;
+
+    --sans: Candara, Optima, "Gill Sans MT", "Segoe UI", sans-serif;
+    --mono: Consolas, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  /* ---- masthead ---- */
+  .masthead {
+    display: flex; flex-wrap: wrap; align-items: baseline;
+    gap: 8px 20px; padding-bottom: 14px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .masthead h1 { margin: 0; font-size: 30px; font-weight: 600; letter-spacing: -0.01em; }
+  .masthead p { margin: 0; color: var(--muted); font-size: 15px; }
+  .provenance {
+    margin: 10px 0 26px; color: var(--muted);
+    font-family: var(--mono); font-size: 12.5px;
+  }
+
+  /* ---- product selector ---- */
+  .products { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+  .products button {
+    font-family: var(--mono); font-size: 13px;
+    padding: 7px 13px; cursor: pointer;
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 2px;
+  }
+  .products button:hover { border-color: var(--ink); color: var(--ink); }
+  .products button[aria-pressed="true"] {
+    background: var(--ink); border-color: var(--ink); color: var(--ground);
+  }
+  .products button:focus-visible,
+  input[type=range]:focus-visible { outline: 2px solid var(--mine); outline-offset: 2px; }
+
+  /* ---- layout ---- */
+  .stage { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(0,1fr); gap: 22px; }
+  @media (max-width: 860px) { .stage { grid-template-columns: minmax(0,1fr); } }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); padding: 18px 20px; min-width: 0; }
+  .scroll { overflow-x: auto; }
+  .panel h2 {
+    margin: 0 0 4px; font-size: 15px; font-weight: 600;
+  }
+  .panel .note { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+
+  /* ---- depth ladder ---- */
+  .rung { display: grid; grid-template-columns: 108px 1fr 78px; align-items: center; gap: 10px; height: 19px; }
+  .rung .px { font-family: var(--mono); font-size: 12px; text-align: right; }
+  .rung .amt { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .track { position: relative; height: 12px; background: rgba(18,35,58,0.05); }
+  .fill { position: absolute; inset: 0 auto 0 0; }
+  .fill.ask { background: var(--ask); }
+  .fill.bid { background: var(--bid); }
+  @media (prefers-reduced-motion: no-preference) {
+    .fill { transition: width 260ms ease-out; }
+  }
+
+  .spreadband {
+    display: grid; grid-template-columns: 108px 1fr 78px; gap: 10px;
+    align-items: center; margin: 7px 0;
+    border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink);
+    padding: 7px 0;
+  }
+  .spreadband .label { font-size: 12px; color: var(--muted); text-align: right; }
+  .spreadband .val { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+
+  /* ---- timeline ---- */
+  .timeline { margin: 22px 0 26px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--line); }
+  .timeline .head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+  .timeline .clock { font-family: var(--mono); font-size: 22px; font-weight: 600; }
+  .timeline .span { color: var(--muted); font-size: 13px; }
+  input[type=range] { width: 100%; margin: 14px 0 4px; accent-color: var(--ink); }
+  .ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  /* ---- tables ---- */
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
+  th {
+    text-align: right; font-weight: 600; color: var(--muted);
+    font-size: 11.5px; padding: 5px 8px; border-bottom: 1px solid var(--line);
+  }
+  th:first-child, td:first-child { text-align: left; }
+  td { text-align: right; padding: 6px 8px; border-bottom: 1px solid rgba(201,210,218,0.5); }
+  tr.here td { background: rgba(18,35,58,0.05); }
+  .buy  { color: var(--bid); }
+  .sell { color: var(--ask); }
+
+  .mine {
+    border-left: 3px solid var(--mine);
+    padding-left: 14px; margin-top: 18px;
+  }
+  .mine h3 { margin: 0 0 3px; font-size: 14px; font-weight: 600; }
+  .mine p { margin: 0 0 12px; color: var(--muted); font-size: 12.5px; }
+  .delta.up { color: var(--bid); }
+  .delta.down { color: var(--ask); }
+
+  .empty { padding: 40px; border: 1px dashed var(--line); text-align: center; color: var(--muted); }
+  .empty code { font-family: var(--mono); color: var(--ink); }
+  footer { margin-top: 34px; color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 24px 14px 48px; }
+    .panel { padding: 16px 14px; }
+    .rung, .spreadband { grid-template-columns: 84px minmax(0,1fr) 58px; gap: 7px; }
+    .rung .px { font-size: 10.5px; }
+    .rung .amt, .spreadband .val { font-size: 10.5px; }
+    table { font-size: 11px; }
+    th, td { padding: 5px 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var D = window.MERKEL_DATA;
+
+  if (!D) {
+    app.innerHTML =
+      '<div class="empty"><p>No exported data yet.</p>' +
+      '<p>Run <code>trader.exe</code>, choose option <code>7</code> to export, ' +
+      'then reload this page.</p>' +
+      '<p>It writes <code>dashboard_data.js</code> next to this file.</p></div>';
+    return;
+  }
+
+  // ---- formatting -------------------------------------------------------
+  // Prices here span BTC at ~5350 down to DOGE at 0.0000003, so pick the
+  // precision from the magnitude rather than using one fixed setting.
+  function px(v) {
+    if (v === 0) return '0';
+    var a = Math.abs(v);
+    if (a >= 1000) return v.toFixed(2);
+    if (a >= 1)    return v.toFixed(4);
+    if (a >= 0.001) return v.toFixed(6);
+    return v.toFixed(9);
+  }
+  function amt(v) {
+    if (Math.abs(v) >= 1000) return v.toFixed(0);
+    if (Math.abs(v) >= 1) return v.toFixed(3);
+    return v.toFixed(5);
+  }
+  function clock(ts) { return ts.slice(11, 19); }
+
+  var state = { product: D.products.indexOf('ETH/BTC') >= 0 ? 'ETH/BTC' : D.products[0], t: 0 };
+
+  // ---- shell ------------------------------------------------------------
+  var elapsed = (function () {
+    var a = D.times[0], b = D.times[D.times.length - 1];
+    var s = function (x) { return +x.slice(17, 19) + 60 * +x.slice(14, 16); };
+    return s(b) - s(a);
+  })();
+
+  app.innerHTML =
+    '<div class="masthead">' +
+      '<h1>Merkel Rex</h1>' +
+      '<p>Order book replay — 17 March 2020</p>' +
+    '</div>' +
+    '<p class="provenance">' + D.entryCount.toLocaleString() + ' entries · ' +
+      D.products.length + ' products · ' + D.times.length + ' snapshots over ' +
+      elapsed + ' seconds · computed in C++, drawn here' +
+      (D.realData ? '' : ' · WARNING: mock data, CSV not found') +
+    '</p>' +
+    '<div class="products" id="products" role="group" aria-label="Product"></div>' +
+    '<div class="timeline">' +
+      '<div class="head"><span class="clock" id="clock"></span>' +
+      '<span class="span">snapshot <span id="tno"></span> of ' + D.times.length + '</span></div>' +
+      '<input type="range" id="scrub" min="0" max="' + (D.times.length - 1) + '" value="0" ' +
+        'step="1" aria-label="Snapshot time">' +
+      '<div class="ticks">' + D.times.map(function (t) {
+        return '<span>' + t.slice(17, 19) + 's</span>'; }).join('') +
+      '</div>' +
+    '</div>' +
+    '<div class="stage">' +
+      '<div class="panel">' +
+        '<h2>Depth at this moment</h2>' +
+        '<p class="note">Bars show volume accumulating away from the spread. ' +
+          'Top 15 levels each side.</p>' +
+        '<div id="ladder"></div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="panel">' +
+          '<h2>Best bid and ask</h2>' +
+          '<p class="note">The gap between the lines is the spread.</p>' +
+          '<div id="chart"></div>' +
+        '</div>' +
+        '<div class="panel" style="margin-top:22px">' +
+          '<h2>Every product, this snapshot</h2>' +
+          '<p class="note">Click a row to switch product.</p>' +
+          '<div id="summary"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="panel" style="margin-top:22px">' +
+      '<h2>Your simulated account</h2>' +
+      '<p class="note">Only orders you placed can execute — the recorded market never crosses itself.</p>' +
+      '<div id="account"></div>' +
+    '</div>' +
+    '<footer>Generated by <code>trader.exe</code> option 7. ' +
+      'Every figure above was computed by the C++ matching engine.</footer>';
+
+  // ---- product buttons --------------------------------------------------
+  var pbox = document.getElementById('products');
+  D.products.forEach(function (p) {
+    var b = document.createElement('button');
+    b.textContent = p;
+    b.setAttribute('aria-pressed', p === state.product);
+    b.onclick = function () { state.product = p; render(); };
+    pbox.appendChild(b);
+  });
+
+  var scrub = document.getElementById('scrub');
+  scrub.oninput = function () { state.t = +scrub.value; render(); };
+
+  // ---- depth ladder -----------------------------------------------------
+  function ladder(snap) {
+    if (!snap.asks.length && !snap.bids.length) {
+      return '<p class="note">No orders for this product at this moment.</p>';
+    }
+    var peak = 0;
+    snap.asks.concat(snap.bids).forEach(function (l) { peak = Math.max(peak, l[2]); });
+    if (peak === 0) peak = 1;
+
+    function rung(level, side) {
+      var w = (level[2] / peak * 100).toFixed(1);
+      return '<div class="rung">' +
+        '<span class="px">' + px(level[0]) + '</span>' +
+        '<span class="track"><span class="fill ' + side + '" style="width:' + w + '%"></span></span>' +
+        '<span class="amt">' + amt(level[2]) + '</span>' +
+      '</div>';
+    }
+
+    // Asks descend toward the spread, so the cheapest sits just above it.
+    var out = snap.asks.slice().reverse().map(function (l) { return rung(l, 'ask'); }).join('');
+
+    out += '<div class="spreadband">' +
+      '<span class="label">spread</span>' +
+      '<span class="val">' + px(snap.spread) + '</span>' +
+      '<span></span></div>';
+
+    out += snap.bids.map(function (l) { return rung(l, 'bid'); }).join('');
+    return out;
+  }
+
+  // ---- best bid / ask over time ----------------------------------------
+  function chart(series) {
+    var W = 380, H = 170, L = 62, R = 8, T = 10, B = 22;
+    var vals = [];
+    series.forEach(function (s) {
+      if (s.bestAsk) vals.push(s.bestAsk);
+      if (s.bestBid) vals.push(s.bestBid);
+    });
+    if (!vals.length) return '<p class="note">Nothing to plot.</p>';
+
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    if (hi === lo) { hi = lo * 1.001 || 1; lo = lo * 0.999; }
+    var pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+
+    var x = function (i) { return L + i * (W - L - R) / Math.max(1, series.length - 1); };
+    var y = function (v) { return T + (hi - v) / (hi - lo) * (H - T - B); };
+
+    // Some snapshots have no orders at all for a product, so the line has to
+    // break rather than dive to zero.
+    var live = [];
+    series.forEach(function (s, i) { if (s.bestAsk > 0 && s.bestBid > 0) live.push(i); });
+    if (!live.length) return '<p class="note">Nothing to plot.</p>';
+
+    function path(key) {
+      var d = '', pen = false;
+      series.forEach(function (s, i) {
+        if (s[key] > 0) {
+          d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(s[key]).toFixed(1) + ' ';
+          pen = true;
+        } else { pen = false; }
+      });
+      return d;
+    }
+
+    var band = live.map(function (i, n) {
+        return (n ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(series[i].bestAsk).toFixed(1);
+      }).join(' ') + ' ' +
+      live.slice().reverse().map(function (i) {
+        return 'L' + x(i).toFixed(1) + ' ' + y(series[i].bestBid).toFixed(1);
+      }).join(' ') + ' Z';
+
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" ' +
+      'aria-label="Best bid and best ask across the recorded snapshots">';
+    svg += '<path d="' + band + '" fill="rgba(18,35,58,0.09)"/>';
+    svg += '<path d="' + path('bestAsk') + '" fill="none" stroke="var(--ask)" stroke-width="1.6"/>';
+    svg += '<path d="' + path('bestBid') + '" fill="none" stroke="var(--bid)" stroke-width="1.6"/>';
+    svg += '<line x1="' + x(state.t).toFixed(1) + '" y1="' + T + '" x2="' + x(state.t).toFixed(1) +
+           '" y2="' + (H - B) + '" stroke="var(--ink)" stroke-width="1" stroke-dasharray="2 3"/>';
+    svg += '<text x="2" y="' + (y(hi - pad) + 4) + '" font-size="10" fill="var(--muted)">' + px(hi - pad) + '</text>';
+    svg += '<text x="2" y="' + (y(lo + pad) + 4) + '" font-size="10" fill="var(--muted)">' + px(lo + pad) + '</text>';
+    svg += '<text x="' + L + '" y="' + (H - 6) + '" font-size="10" fill="var(--muted)">' + clock(D.times[0]) + '</text>';
+    svg += '<text x="' + W + '" y="' + (H - 6) + '" text-anchor="end" font-size="10" fill="var(--muted)">' + clock(D.times[D.times.length - 1]) + '</text>';
+    svg += '</svg>';
+    return svg;
+  }
+
+  // ---- all products at this instant ------------------------------------
+  function summary() {
+    var rows = D.products.map(function (p) {
+      var s = D.market[p][state.t];
+      var none = (s.bidCount + s.askCount) === 0;
+      return '<tr class="' + (p === state.product ? 'here' : '') + '" data-p="' + p + '" ' +
+        'tabindex="0" role="button" style="cursor:pointer">' +
+        '<td>' + p + '</td>' +
+        '<td class="buy">' + (none ? '—' : px(s.bestBid)) + '</td>' +
+        '<td class="sell">' + (none ? '—' : px(s.bestAsk)) + '</td>' +
+        '<td>' + (none ? '—' : px(s.spread)) + '</td>' +
+        '<td>' + (s.bidCount + s.askCount) + '</td></tr>';
+    }).join('');
+    return '<div class="scroll"><table><thead><tr><th>product</th><th>best bid</th>' +
+      '<th>best ask</th><th>spread</th><th>orders</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div>';
+  }
+
+  // ---- wallet and fills -------------------------------------------------
+  function account() {
+    var out = '';
+    if (D.trades.length) {
+      out += '<div class="scroll"><table><thead><tr><th>time</th><th>product</th>' +
+        '<th>side</th><th>price</th><th>amount</th></tr></thead><tbody>' +
+        D.trades.map(function (t) {
+          return '<tr><td>' + clock(t.t) + '</td><td>' + t.product + '</td>' +
+            '<td class="' + t.side + '">' + t.side + '</td>' +
+            '<td>' + px(t.price) + '</td><td>' + amt(t.amount) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    } else {
+      out += '<p class="note">No fills yet. Place a bid or ask in the app, ' +
+        'advance a time step, then export again.</p>';
+    }
+
+    out += '<div class="mine"><h3>Wallet</h3><p>Opening balance against current.</p>' +
+      '<div class="scroll"><table><thead><tr><th>currency</th><th>opened with</th><th>holds now</th>' +
+      '<th>change</th></tr></thead><tbody>';
+    Object.keys(D.wallet.now).forEach(function (c) {
+      var a = D.wallet.start[c] || 0, b = D.wallet.now[c], d = b - a;
+      var cls = Math.abs(d) < 1e-12 ? '' : (d > 0 ? 'delta up' : 'delta down');
+      out += '<tr><td>' + c + '</td><td>' + amt(a) + '</td><td>' + amt(b) + '</td>' +
+        '<td class="' + cls + '">' + (d > 0 ? '+' : '') + amt(d) + '</td></tr>';
+    });
+    return out + '</tbody></table></div></div>';
+  }
+
+  // ---- render -----------------------------------------------------------
+  function render() {
+    var series = D.market[state.product];
+    var snap = series[state.t];
+
+    document.getElementById('clock').textContent = clock(D.times[state.t]);
+    document.getElementById('tno').textContent = state.t + 1;
+    document.getElementById('ladder').innerHTML = ladder(snap);
+    document.getElementById('chart').innerHTML = chart(series);
+    document.getElementById('summary').innerHTML = summary();
+    document.getElementById('account').innerHTML = account();
+
+    Array.prototype.forEach.call(pbox.children, function (b) {
+      b.setAttribute('aria-pressed', b.textContent === state.product);
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('#summary tr[data-p]'), function (tr) {
+      var pick = function () { state.product = tr.dataset.p; render(); };
+      tr.onclick = pick;
+      tr.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } };
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
