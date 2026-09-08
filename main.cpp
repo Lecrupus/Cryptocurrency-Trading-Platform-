@@ -1,14 +1,17 @@
 /**
  * Cryptocurrency Trading Platform (Simulator)
  * Based on University of London / Coursera OOP Specialization
- * * Features:
+ *
+ * Features:
  * - OOP Architecture (Wallet, OrderBook, Matching Engine)
  * - STL Containers (Vectors, Maps)
+ * - Loads real market data from CSV
  * - Time-step simulation
  * - Matching Engine
  */
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <string>
 #include <map>
@@ -16,6 +19,7 @@
 #include <sstream>
 #include <iomanip>
 #include <limits>
+#include <stdexcept>
 
 // ==========================================
 // 1. Data Structures & Enums
@@ -32,15 +36,21 @@ public:
     OrderBookType orderType;
     std::string username;
 
-    OrderBookEntry(double _price, double _amount, std::string _timestamp, 
+    OrderBookEntry(double _price, double _amount, std::string _timestamp,
                    std::string _product, OrderBookType _orderType, std::string _username = "dataset")
-    : price(_price), amount(_amount), timestamp(_timestamp), 
+    : price(_price), amount(_amount), timestamp(_timestamp),
       product(_product), orderType(_orderType), username(_username) {}
+
+    static OrderBookType stringToOrderBookType(const std::string& s) {
+        if (s == "ask") return OrderBookType::ask;
+        if (s == "bid") return OrderBookType::bid;
+        return OrderBookType::unknown;
+    }
 
     static bool compareByTimestamp(const OrderBookEntry& e1, const OrderBookEntry& e2) {
         return e1.timestamp < e2.timestamp;
     }
-    
+
     static bool compareByPriceAsc(const OrderBookEntry& e1, const OrderBookEntry& e2) {
         return e1.price < e2.price;
     }
@@ -58,18 +68,55 @@ class CSVReader {
 public:
     static std::vector<std::string> tokenise(std::string csvLine, char separator) {
         std::vector<std::string> tokens;
-        signed int start, end;
+        std::string::size_type start, end;
         std::string token;
         start = csvLine.find_first_not_of(separator, 0);
         do {
             end = csvLine.find_first_of(separator, start);
             if (start == csvLine.length() || start == end) break;
-            if (end >= 0) token = csvLine.substr(start, end - start);
+            if (end != std::string::npos) token = csvLine.substr(start, end - start);
             else token = csvLine.substr(start, csvLine.length() - start);
             tokens.push_back(token);
             start = end + 1;
-        } while (end > 0);
+        } while (end != std::string::npos);
         return tokens;
+    }
+
+    // Turns one line of CSV into an OrderBookEntry. Throws if the line is malformed.
+    static OrderBookEntry stringsToOBE(std::vector<std::string> tokens) {
+        if (tokens.size() != 5) throw std::invalid_argument("wrong number of columns");
+        double price = std::stod(tokens[3]);
+        double amount = std::stod(tokens[4]);
+        return OrderBookEntry(price, amount, tokens[0], tokens[1],
+                              OrderBookEntry::stringToOrderBookType(tokens[2]));
+    }
+
+    // Reads the whole file, skipping any line it cannot parse.
+    static std::vector<OrderBookEntry> readCSV(std::string csvFilename) {
+        std::vector<OrderBookEntry> entries;
+        std::ifstream csvFile{csvFilename};
+        std::string line;
+        int badLines = 0;
+
+        if (!csvFile.is_open()) {
+            std::cout << "CSVReader: could not open " << csvFilename << std::endl;
+            return entries;
+        }
+
+        while (std::getline(csvFile, line)) {
+            if (line.empty()) continue;
+            try {
+                entries.push_back(stringsToOBE(tokenise(line, ',')));
+            } catch (const std::exception& e) {
+                ++badLines;
+            }
+        }
+        csvFile.close();
+
+        std::cout << "CSVReader: read " << entries.size() << " entries from " << csvFilename;
+        if (badLines > 0) std::cout << " (skipped " << badLines << " bad lines)";
+        std::cout << std::endl;
+        return entries;
     }
 };
 
@@ -80,10 +127,10 @@ public:
 class Wallet {
 public:
     Wallet() {}
-    
+
     void insertCurrency(std::string type, double amount) {
         double balance;
-        if (amount < 0) throw std::exception();
+        if (amount < 0) throw std::invalid_argument("negative amount");
         if (currencies.count(type) == 0) balance = 0;
         else balance = currencies[type];
         balance += amount;
@@ -105,17 +152,48 @@ public:
         return currencies[type] >= amount;
     }
 
-    std::string toString() {
-        std::string s;
-        for (std::pair<std::string, double> pair : currencies) {
-            std::string currency = pair.first;
-            double amount = pair.second;
-            s += currency + " : " + std::to_string(amount) + "\n";
+    // Can this wallet afford the order it is about to place?
+    bool canFulfillOrder(OrderBookEntry order) {
+        std::vector<std::string> currs = CSVReader::tokenise(order.product, '/');
+        if (currs.size() != 2) return false;
+
+        if (order.orderType == OrderBookType::ask) {
+            // To sell ETH for BTC, I need the ETH
+            return containsCurrency(currs[0], order.amount);
         }
-        return s;
+        if (order.orderType == OrderBookType::bid) {
+            // To buy ETH with BTC, I need the BTC
+            return containsCurrency(currs[1], order.amount * order.price);
+        }
+        return false;
     }
 
-private:
+    // Move the funds once a sale has actually been matched.
+    void processSale(OrderBookEntry& sale) {
+        std::vector<std::string> currs = CSVReader::tokenise(sale.product, '/');
+        if (currs.size() != 2) return;
+
+        if (sale.orderType == OrderBookType::asksale) {   // we sold
+            currencies[currs[0]] -= sale.amount;
+            currencies[currs[1]] += sale.amount * sale.price;
+        }
+        if (sale.orderType == OrderBookType::bidsale) {   // we bought
+            currencies[currs[0]] += sale.amount;
+            currencies[currs[1]] -= sale.amount * sale.price;
+        }
+    }
+
+    std::string toString() {
+        std::ostringstream s;
+        s << std::fixed << std::setprecision(8);
+        for (std::pair<std::string, double> pair : currencies) {
+            s << "  " << std::setw(6) << std::left << pair.first
+              << " : " << pair.second << "\n";
+        }
+        return s.str();
+    }
+
+protected:
     std::map<std::string, double> currencies;
 };
 
@@ -125,27 +203,20 @@ private:
 
 class OrderBook {
 public:
-    OrderBook() {
-        // MOCK DATA LOADING (Since we don't have the external CSV file)
-        // Format: Price, Amount, Timestamp, Product, Type
-        orders.emplace_back(10000, 0.5, "2020/03/17 17:01:24", "BTC/USDT", OrderBookType::bid);
-        orders.emplace_back(10500, 0.2, "2020/03/17 17:01:24", "BTC/USDT", OrderBookType::ask);
-        orders.emplace_back(10100, 1.0, "2020/03/17 17:01:24", "BTC/USDT", OrderBookType::bid);
-        
-        // Next time frame
-        orders.emplace_back(200, 50, "2020/03/17 17:01:30", "ETH/USDT", OrderBookType::ask);
-        orders.emplace_back(190, 10, "2020/03/17 17:01:30", "ETH/USDT", OrderBookType::bid);
+    explicit OrderBook(std::string filename) {
+        orders = CSVReader::readCSV(filename);
+        if (orders.empty()) {
+            std::cout << "OrderBook: falling back to built-in mock data." << std::endl;
+            loadMockData();
+        }
+        std::sort(orders.begin(), orders.end(), OrderBookEntry::compareByTimestamp);
     }
 
     std::vector<std::string> getKnownProducts() {
         std::vector<std::string> products;
         std::map<std::string, bool> prodMap;
-        for (OrderBookEntry& e : orders) {
-            prodMap[e.product] = true;
-        }
-        for (auto const& [key, val] : prodMap) {
-            products.push_back(key);
-        }
+        for (OrderBookEntry& e : orders) prodMap[e.product] = true;
+        for (auto const& [key, val] : prodMap) products.push_back(key);
         return products;
     }
 
@@ -159,19 +230,17 @@ public:
         return orders_sub;
     }
 
-    double getHighPrice(std::vector<OrderBookEntry>& orders) {
+    static double getHighPrice(std::vector<OrderBookEntry>& orders) {
+        if (orders.empty()) throw std::invalid_argument("no orders");
         double max = orders[0].price;
-        for (OrderBookEntry& e : orders) {
-            if (e.price > max) max = e.price;
-        }
+        for (OrderBookEntry& e : orders) if (e.price > max) max = e.price;
         return max;
     }
 
-    double getLowPrice(std::vector<OrderBookEntry>& orders) {
+    static double getLowPrice(std::vector<OrderBookEntry>& orders) {
+        if (orders.empty()) throw std::invalid_argument("no orders");
         double min = orders[0].price;
-        for (OrderBookEntry& e : orders) {
-            if (e.price < min) min = e.price;
-        }
+        for (OrderBookEntry& e : orders) if (e.price < min) min = e.price;
         return min;
     }
 
@@ -187,9 +256,7 @@ public:
                 break;
             }
         }
-        if (next_timestamp == "") {
-            next_timestamp = orders[0].timestamp; // Wrap around
-        }
+        if (next_timestamp == "") next_timestamp = orders[0].timestamp; // wrap around
         return next_timestamp;
     }
 
@@ -209,8 +276,8 @@ public:
         for (OrderBookEntry& ask : asks) {
             for (OrderBookEntry& bid : bids) {
                 if (bid.price >= ask.price) {
-                    OrderBookEntry sale{ask.price, 0, timestamp, product, OrderBookType::asksale};
-                    
+                    OrderBookEntry sale{ask.price, 0.0, timestamp, product, OrderBookType::asksale};
+
                     if (bid.username == "simuser") {
                         sale.username = "simuser";
                         sale.orderType = OrderBookType::bidsale;
@@ -246,6 +313,14 @@ public:
     }
 
 private:
+    void loadMockData() {
+        orders.emplace_back(10000, 0.5, "2020/03/17 17:01:24", "BTC/USDT", OrderBookType::bid);
+        orders.emplace_back(10500, 0.2, "2020/03/17 17:01:24", "BTC/USDT", OrderBookType::ask);
+        orders.emplace_back(10100, 1.0, "2020/03/17 17:01:24", "BTC/USDT", OrderBookType::bid);
+        orders.emplace_back(200, 50, "2020/03/17 17:01:30", "ETH/USDT", OrderBookType::ask);
+        orders.emplace_back(190, 10, "2020/03/17 17:01:30", "ETH/USDT", OrderBookType::bid);
+    }
+
     std::vector<OrderBookEntry> orders;
 };
 
@@ -261,13 +336,15 @@ public:
         int input;
         currentTime = orderBook.getEarliestTime();
         wallet.insertCurrency("BTC", 10);
-        wallet.insertCurrency("USDT", 100000); // Initial dummy money
+        wallet.insertCurrency("ETH", 100);
+        wallet.insertCurrency("USDT", 100000);
 
-        while (true) {
+        while (running) {
             printMenu();
             input = getUserOption();
             processUserOption(input);
         }
+        std::cout << "Goodbye." << std::endl;
     }
 
 private:
@@ -282,110 +359,122 @@ private:
         std::cout << "4: Make a bid (Buy)" << std::endl;
         std::cout << "5: Print wallet" << std::endl;
         std::cout << "6: Continue (Next Time Step)" << std::endl;
+        std::cout << "7: Exit" << std::endl;
         std::cout << "========================================" << std::endl;
-        std::cout << "Type in 1-6: ";
+        std::cout << "Type in 1-7: ";
     }
 
     int getUserOption() {
         int userOption = 0;
         std::string line;
-        std::getline(std::cin, line);
+        if (!std::getline(std::cin, line)) {   // end of input (e.g. a piped demo script)
+            running = false;
+            return 0;
+        }
+        std::cout << line << std::endl;        // echo, so recorded demos read naturally
         try {
             userOption = std::stoi(line);
         } catch (const std::exception& e) {
-            // Invalid input
+            std::cout << "Invalid choice." << std::endl;
         }
         return userOption;
     }
 
     void processUserOption(int userOption) {
-        if (userOption == 0) return; // invalid
+        if (userOption == 0) return;
         if (userOption == 1) printHelp();
         if (userOption == 2) printMarketStats();
         if (userOption == 3) enterAsk();
         if (userOption == 4) enterBid();
         if (userOption == 5) printWallet();
         if (userOption == 6) gotoNextTimeframe();
+        if (userOption == 7) running = false;
     }
 
     void printHelp() {
-        std::cout << "Help - Your aim is to make money. Analyze the market and trade." << std::endl;
+        std::cout << "Help - Your aim is to make money. Analyse the market and trade." << std::endl;
     }
 
     void printMarketStats() {
+        std::cout << std::fixed << std::setprecision(8);
         for (std::string const& p : orderBook.getKnownProducts()) {
             std::cout << "Product: " << p << std::endl;
-            std::vector<OrderBookEntry> entries = orderBook.getOrders(OrderBookType::ask, p, currentTime);
-            if (!entries.empty()) {
-                std::cout << "  Asks seen: " << entries.size() << std::endl;
-                std::cout << "  Max ask: " << orderBook.getHighPrice(entries) << std::endl;
-                std::cout << "  Min ask: " << orderBook.getLowPrice(entries) << std::endl;
+
+            std::vector<OrderBookEntry> asks = orderBook.getOrders(OrderBookType::ask, p, currentTime);
+            std::vector<OrderBookEntry> bids = orderBook.getOrders(OrderBookType::bid, p, currentTime);
+
+            if (!asks.empty()) {
+                std::cout << "  Asks seen: " << asks.size()
+                          << " | max " << OrderBook::getHighPrice(asks)
+                          << " | min " << OrderBook::getLowPrice(asks) << std::endl;
             } else {
-                std::cout << "  No Asks" << std::endl;
+                std::cout << "  No asks" << std::endl;
+            }
+
+            if (!bids.empty()) {
+                std::cout << "  Bids seen: " << bids.size()
+                          << " | max " << OrderBook::getHighPrice(bids)
+                          << " | min " << OrderBook::getLowPrice(bids) << std::endl;
+            } else {
+                std::cout << "  No bids" << std::endl;
+            }
+
+            if (!asks.empty() && !bids.empty()) {
+                double spread = OrderBook::getLowPrice(asks) - OrderBook::getHighPrice(bids);
+                std::cout << "  Spread   : " << spread << std::endl;
             }
         }
+        std::cout << std::defaultfloat;
     }
 
     void enterAsk() {
-        std::cout << "Make an ask - enter the amount: product,price,amount, eg ETH/BTC,200,0.5" << std::endl;
-        std::string input;
-        std::getline(std::cin, input);
-        
-        std::vector<std::string> tokens = CSVReader::tokenise(input, ',');
-        if (tokens.size() != 3) {
-            std::cout << "Bad input!" << std::endl;
-        } else {
-            try {
-                OrderBookEntry obe{std::stod(tokens[1]), std::stod(tokens[2]), currentTime, tokens[0], OrderBookType::ask, "simuser"};
-                obe.username = "simuser";
-                if (wallet.canFulfillOrder(obe)) {
-                    std::cout << "Wallet looks good." << std::endl;
-                    orderBook.insertOrder(obe);
-                } else {
-                    std::cout << "Wallet has insufficient funds." << std::endl;
-                }
-            } catch (const std::exception& e) {
-                std::cout << "Bad input!" << std::endl;
-            }
-        }
+        std::cout << "Make an ask - product,price,amount, eg ETH/BTC,0.02,0.5" << std::endl;
+        enterOrder(OrderBookType::ask);
     }
 
     void enterBid() {
-        std::cout << "Make a bid - enter the amount: product,price,amount, eg ETH/BTC,200,0.5" << std::endl;
+        std::cout << "Make a bid - product,price,amount, eg ETH/BTC,0.02,0.5" << std::endl;
+        enterOrder(OrderBookType::bid);
+    }
+
+    // Both menu options do the same job apart from the order type.
+    void enterOrder(OrderBookType type) {
         std::string input;
-        std::getline(std::cin, input);
-        
+        if (!std::getline(std::cin, input)) { running = false; return; }
+        std::cout << input << std::endl;
+
         std::vector<std::string> tokens = CSVReader::tokenise(input, ',');
         if (tokens.size() != 3) {
-            std::cout << "Bad input!" << std::endl;
-        } else {
-            try {
-                OrderBookEntry obe{std::stod(tokens[1]), std::stod(tokens[2]), currentTime, tokens[0], OrderBookType::bid, "simuser"};
-                if (wallet.canFulfillOrder(obe)) {
-                    std::cout << "Wallet looks good." << std::endl;
-                    orderBook.insertOrder(obe);
-                } else {
-                    std::cout << "Wallet has insufficient funds." << std::endl;
-                }
-            } catch (const std::exception& e) {
-                std::cout << "Bad input!" << std::endl;
+            std::cout << "Bad input! Expected product,price,amount" << std::endl;
+            return;
+        }
+        try {
+            OrderBookEntry obe{std::stod(tokens[1]), std::stod(tokens[2]),
+                               currentTime, tokens[0], type, "simuser"};
+            if (wallet.canFulfillOrder(obe)) {
+                std::cout << "Wallet looks good. Order placed." << std::endl;
+                orderBook.insertOrder(obe);
+            } else {
+                std::cout << "Wallet has insufficient funds." << std::endl;
             }
+        } catch (const std::exception& e) {
+            std::cout << "Bad input! Could not read price/amount." << std::endl;
         }
     }
 
     void printWallet() {
-        std::cout << wallet.toString() << std::endl;
+        std::cout << "Wallet:" << std::endl << wallet.toString();
     }
 
     void gotoNextTimeframe() {
         std::cout << "Going to next time frame..." << std::endl;
         for (std::string& p : orderBook.getKnownProducts()) {
-            std::cout << "Matching " << p << std::endl;
             std::vector<OrderBookEntry> sales = orderBook.matchAsksToBids(p, currentTime);
-            std::cout << "Sales: " << sales.size() << std::endl;
+            std::cout << "Matching " << p << " -> " << sales.size() << " sales" << std::endl;
             for (OrderBookEntry& sale : sales) {
-                std::cout << "Sale price: " << sale.price << " amount " << sale.amount << std::endl;
                 if (sale.username == "simuser") {
+                    std::cout << "  *** YOUR TRADE FILLED *** price " << sale.price
+                              << " amount " << sale.amount << std::endl;
                     wallet.processSale(sale);
                 }
             }
@@ -393,54 +482,21 @@ private:
         currentTime = orderBook.getNextTime(currentTime);
     }
 
-    // Extended Wallet helper to handle simulated checking/processing
-    class ExtendedWallet : public Wallet {
-    public:
-        bool canFulfillOrder(OrderBookEntry order) {
-            std::vector<std::string> currs = CSVReader::tokenise(order.product, '/');
-            if (order.orderType == OrderBookType::ask) {
-                // To sell ETH, I need ETH
-                return containsCurrency(currs[0], order.amount);
-            }
-            if (order.orderType == OrderBookType::bid) {
-                // To buy ETH for USDT, I need USDT
-                return containsCurrency(currs[1], order.amount * order.price);
-            }
-            return false;
-        }
-
-        void processSale(OrderBookEntry& sale) {
-            std::vector<std::string> currs = CSVReader::tokenise(sale.product, '/');
-            if (sale.orderType == OrderBookType::asksale) {
-                // You sold sold something
-                double outgoing = sale.amount;
-                double incoming = sale.amount * sale.price;
-                currencies[currs[0]] -= outgoing; // Sold ETH
-                currencies[currs[1]] += incoming; // Got USDT
-            }
-            if (sale.orderType == OrderBookType::bidsale) {
-                // You bought something
-                double incoming = sale.amount;
-                double outgoing = sale.amount * sale.price;
-                currencies[currs[0]] += incoming; // Got ETH
-                currencies[currs[1]] -= outgoing; // Paid USDT
-            }
-        }
-        // Need access to parent's map, usually done via protected but here using friend or structure change
-        // For single file simplicity, I will assume base class members are protected or handled here.
-        using Wallet::currencies; // Assumes currencies is protected in Wallet, let's fix Wallet visibility below
-    } wallet;
-    
-    // Fix Wallet class visibility for this specific inheritance trick:
-    // Ideally, Wallet properties should be protected. 
-    // *I have updated the Wallet class below to make `currencies` protected for this to work.*
+    OrderBook orderBook{"20200317.csv"};
+    Wallet wallet;
+    std::string currentTime;
+    bool running = true;
 };
 
 // ==========================================
 // Main Entry Point
 // ==========================================
+// UNIT_TESTS is defined only when tests.cpp includes this file, so that the
+// test harness can supply its own main().
+#ifndef UNIT_TESTS
 int main() {
     MerkelMain app;
     app.init();
     return 0;
 }
+#endif
